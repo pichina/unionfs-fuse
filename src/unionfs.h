@@ -43,5 +43,6 @@ typedef struct {
 } branch_entry_t;
 
 extern struct fuse_operations unionfs_oper;
+extern struct hashtable *g_patHash;
 
 #endif

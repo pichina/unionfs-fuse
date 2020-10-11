@@ -39,6 +39,8 @@ static struct fuse_opt unionfs_opts[] = {
 	FUSE_OPT_END
 };
 
+
+
 int main(int argc, char *argv[]) {
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 

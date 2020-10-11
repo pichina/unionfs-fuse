@@ -57,6 +57,7 @@
 #include "usyslog.h"
 #include "conf.h"
 #include "uioctl.h"
+#include "hashtable.h"
 
 static int unionfs_chmod(const char *path, mode_t mode) {
 	DBG("%s\n", path);
@@ -115,6 +116,10 @@ static int unionfs_create(const char *path, mode_t mode, struct fuse_file_info *
 
 	fi->fh = res;
 	remove_hidden(path, i);
+
+    char *key;
+    key =strdup(p);
+    hashtable_insert(g_patHash, key, key);
 
 	DBG("fd = %" PRIx64 "\n", fi->fh);
 	RETURN(0);
@@ -208,6 +213,35 @@ static int unionfs_access(const char *path, int mask) {
 	RETURN(0);
 }
 
+struct hashtable *g_patHash = NULL;
+static void patlist_init() {
+    // read pat branch pat_file_stat
+    char f[PATHLEN_MAX];
+    char patPath[PATHLEN_MAX];
+    if (BUILD_PATH(f, uopt.branches[1].path, "pat_file_stat")) {
+        return;
+    }
+	FILE *fp;
+	char patItem[PATHLEN_MAX];
+	fp=fopen(f,"r");
+	if(fp == NULL)
+	{
+		DBG("open pat_file_stat failed");
+		return;
+	}
+	g_patHash = create_hashtable(100, string_hash, string_equal);
+	while(!feof(fp))
+	{
+		fgets(patItem, PATHLEN_MAX, fp);
+        if(BUILD_PATH(patPath, uopt.branches[1].path, patItem)) {
+            continue;
+        }
+        char *key = strdup(patPath);
+        hashtable_insert(g_patHash, key, key);
+	}
+	fclose(fp);
+}
+
 /**
  * init method
  * called before first access to the filesystem
@@ -231,6 +265,7 @@ static void * unionfs_init(struct fuse_conn_info *conn) {
 	if (conn->capable & FUSE_CAP_IOCTL_DIR)
 		conn->want |= FUSE_CAP_IOCTL_DIR;
 #endif
+    patlist_init();
 
 	return NULL;
 }

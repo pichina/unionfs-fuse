@@ -117,6 +117,7 @@ int unionfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t o
 	(void)fi;
 	int i = 0;
 	int rc = 0;
+    char patPath[PATHLEN_MAX];
 
 	// we will store already added files here to handle same file names across different branches
 	struct hashtable *files = create_hashtable(16, string_hash, string_equal);
@@ -129,6 +130,15 @@ int unionfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t o
 
 	for (i = 0; i < uopt.nbranches; i++) {
 		if (subdir_hidden) break;
+
+        if (i == 1) {
+            if (g_patHash == NULL) {
+                break;
+            }
+            if (hashtable_count(g_patHash) == 0) {
+                break;
+            }
+        }
 
 		char p[PATHLEN_MAX];
 		if (BUILD_PATH(p, uopt.branches[i].path, path)) {
@@ -163,6 +173,16 @@ int unionfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t o
 			}
 
 			if (hide_meta_files(i, p, de) == true) continue;
+
+            if ( i == 1) {
+                if(BUILD_PATH(patPath, uopt.branches[1].path, de->d_name)) {
+                    continue;
+                }
+                if(hashtable_search(g_patHash, patPath) == NULL) {
+                    continue;
+                }
+            }
+
 
 			// fill with something dummy, we're interested in key existence only
 			char *key = strdup(de->d_name);
