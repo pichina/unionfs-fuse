@@ -174,7 +174,7 @@ static int unionfs_fsync(const char *path, int isdatasync, struct fuse_file_info
 static int unionfs_getattr(const char *path, struct stat *stbuf) {
 	DBG("%s\n", path);
 
-	int i = find_rorw_branch(path);
+	int i = find_rorw_branch_reverse(path);
 	if (i == -1) RETURN(-errno);
 
 	char p[PATHLEN_MAX];
@@ -213,16 +213,18 @@ static int unionfs_access(const char *path, int mask) {
 	RETURN(0);
 }
 
+#define PAT_FILE_STAT_NAME "pat_file_stat"
 struct hashtable *g_patHash = NULL;
 static void patlist_init() {
     // read pat branch pat_file_stat
     char f[PATHLEN_MAX];
     char patPath[PATHLEN_MAX];
-    if (BUILD_PATH(f, uopt.branches[1].path, "pat_file_stat")) {
+    if (BUILD_PATH(f, uopt.branches[1].path, PAT_FILE_STAT_NAME)) {
         return;
     }
 	FILE *fp;
 	char patItem[PATHLEN_MAX];
+    int itemLen = 0;
 	fp=fopen(f,"r");
 	if(fp == NULL)
 	{
@@ -232,11 +234,19 @@ static void patlist_init() {
 	g_patHash = create_hashtable(100, string_hash, string_equal);
 	while(!feof(fp))
 	{
-		fgets(patItem, PATHLEN_MAX, fp);
+		if (fgets(patItem, PATHLEN_MAX, fp) == NULL) {
+            break;
+        }
+        itemLen = strlen(patItem);
+        if (itemLen > 1 && patItem[itemLen - 1] == '\n') {
+            patItem[itemLen -1] = 0;
+        }
         if(BUILD_PATH(patPath, uopt.branches[1].path, patItem)) {
+            DBG("patItem %s too long.", patItem);
             continue;
         }
         char *key = strdup(patPath);
+		DBG("add %s to pat file hash.", key);
         hashtable_insert(g_patHash, key, key);
 	}
 	fclose(fp);
@@ -405,7 +415,7 @@ static int unionfs_open(const char *path, struct fuse_file_info *fi) {
 	if (fi->flags & (O_WRONLY | O_RDWR)) {
 		i = find_rw_branch_cutlast(path);
 	} else {
-		i = find_rorw_branch(path);
+		i = find_rorw_branch_reverse(path);
 	}
 
 	if (i == -1) RETURN(-errno);
@@ -443,7 +453,7 @@ static int unionfs_read(const char *path, char *buf, size_t size, off_t offset, 
 static int unionfs_readlink(const char *path, char *buf, size_t size) {
 	DBG("%s\n", path);
 
-	int i = find_rorw_branch(path);
+	int i = find_rorw_branch_reverse(path);
 	if (i == -1) RETURN(-errno);
 
 	char p[PATHLEN_MAX];
@@ -747,7 +757,7 @@ static int unionfs_getxattr(const char *path, const char *name, char *value, siz
 #endif
 	DBG("%s\n", path);
 
-	int i = find_rorw_branch(path);
+	int i = find_rorw_branch_reverse(path);
 	if (i == -1) RETURN(-errno);
 
 	char p[PATHLEN_MAX];

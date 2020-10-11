@@ -133,9 +133,11 @@ int unionfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t o
 
         if (i == 1) {
             if (g_patHash == NULL) {
+                DBG("g_patHash is NULL");
                 break;
             }
             if (hashtable_count(g_patHash) == 0) {
+                DBG("g_patHash is empty");
                 break;
             }
         }
@@ -174,13 +176,18 @@ int unionfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t o
 
 			if (hide_meta_files(i, p, de) == true) continue;
 
-            if ( i == 1) {
-                if(BUILD_PATH(patPath, uopt.branches[1].path, de->d_name)) {
+            if (i == 1) {
+                if(BUILD_PATH(patPath, uopt.branches[1].path, path, de->d_name)) {
                     continue;
                 }
-                if(hashtable_search(g_patHash, patPath) == NULL) {
+                DBG("readdir search patPath:%s\n",patPath);
+                DBG("readdir search patPath hash:%u len:%u\n",string_hash(patPath), strlen(patPath));
+                char *hashResult = hashtable_search(g_patHash, patPath);
+                if(hashResult == NULL) {
+                    DBG("pat hash search result is NULL.\n");
                     continue;
                 }
+                DBG("pat hash search result:%s\n",hashResult);
             }
 
 

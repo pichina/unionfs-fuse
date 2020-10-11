@@ -50,6 +50,7 @@
 #include "string.h"
 #include "debug.h"
 #include "usyslog.h"
+#include "hashtable.h"
 
 /**
  *  Find a branch that has "path". Return the branch number.
@@ -64,6 +65,11 @@ static int find_branch(const char *path, searchflag_t flag) {
 			errno = ENAMETOOLONG;
 			RETURN(-1);
 		}
+        if (i == 1) {
+            if (hashtable_search(g_patHash, p) == NULL) {
+                continue;
+            }
+        }
 
 		struct stat stbuf;
 		int res = lstat(p, &stbuf);
@@ -237,5 +243,46 @@ int find_lowest_rw_branch(int branch_ro) {
 		if (uopt.branches[i].rw) RETURN(i); // found it it.
 	}
 
+	RETURN(-1);
+}
+
+
+int find_rorw_branch_reverse(const char *path) {
+	DBG("%s\n", path);
+
+	int i = 0;
+    int res[2]= {0,};
+    char p[PATHLEN_MAX];
+	for (i = 0; i < uopt.nbranches; i++) {
+		if (BUILD_PATH(p, uopt.branches[i].path, path)) {
+			errno = ENAMETOOLONG;
+			RETURN(-1);
+		}
+
+		struct stat stbuf;
+		res[i] = lstat(p, &stbuf);
+
+		DBG("%s: res = %d\n", p, res[i]);
+	}
+
+    if (res[0] == 0) { //file exist in ram
+        if(res[1] == 0) { // file exit in pat
+            RETURN(1);
+        } else {
+            RETURN(0);
+        }
+    } else {
+        if (res[1] == 0) {
+            //this is a new file
+            if (hashtable_search(g_patHash, p)) {
+                RETURN(1);
+            } else {
+                errno = ENOENT;
+                RETURN(-1);
+            }
+        }
+    }
+
+	errno = ENOENT;
 	RETURN(-1);
 }
